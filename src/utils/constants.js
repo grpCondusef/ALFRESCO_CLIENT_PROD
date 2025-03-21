@@ -1,7 +1,7 @@
 
 
 //URL DEL BACKEND DE LA API
-export const URL_API = import.meta.env.VITE_URL_API || `http://10.33.1.238:81`;
+export const URL_API = `http://10.33.1.238:81`
 
 //ESPACIO DEL LOCAL STORAGE
 export const CONDUSEF_TOKEN = "CONDUSEF_TOKEN"

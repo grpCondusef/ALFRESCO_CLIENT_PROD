@@ -14,7 +14,7 @@ services:
 # Password: changeme
 # ------------------------------------------
   nginx:
-    image: 'jc21/nginx-proxy-manager:github-pr-3281'
+    image: 'jc21/nginx-proxy-manager:latest'
     restart: always
     ports:
       - '443:443'

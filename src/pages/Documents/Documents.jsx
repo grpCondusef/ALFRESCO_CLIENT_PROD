@@ -19,11 +19,48 @@ import ErrorMessage from '../../components/ErrorMessage'
 import { MessageModal } from './Components/MessageModal'
 import { handleVerPortada } from './fetchCalls/handleVerPortada'
 import { generarIntegradoFoliado } from './fetchCalls/generarIntegradoFoliado'
+import { generarIntegradoCertificado } from './fetchCalls/generarIntegradoCertificado'
 import upload_icon from '../../img/icons/upload-icon.svg'
 import generar_integrado from '../../img/icons/pdf-integrado-icon.png'
 import folder_icon from '../../img/icons/folder-icon.png'
 import remove_icon from '../../img/icons/remove-client.png'
 import export_document_icon from '../../img/icons/export-pdf-icon.png'
+
+const CertificacionLeyendaModal = ({ leyendaPrevia, onConfirm, onCancel }) => {
+    const [recurrente, setRecurrente] = useState("");
+    const leyendaEditable = leyendaPrevia.replace(
+        "[Escriba aquí el nombre del recurrente]",
+        `<span style="color:red; font-weight:bold;">${recurrente || '[Escriba aquí el nombre del recurrente]'}</span>`
+    );
+    return (
+        <div className="modal-container">
+            <div className="contenido-modal">
+                <h2>Certificación electrónica</h2>
+                <div style={{ margin: "1rem 0", maxHeight: 300, overflow: 'auto' }}>
+                    <div dangerouslySetInnerHTML={{ __html: leyendaEditable }} />
+                </div>
+                <div>
+                    <label>
+                        Nombre o denominación del/la recurrente:
+                        <input
+                            type="text"
+                            value={recurrente}
+                            onChange={e => setRecurrente(e.target.value)}
+                            style={{ width: "100%", marginTop: "0.3rem" }}
+                        />
+                    </label>
+                </div>
+                <div style={{ marginTop: "1.3rem", display: "flex", gap: "1rem" }}>
+                    <button onClick={() => {
+                        if (!recurrente.trim()) return alert("Por favor ingresa el nombre del recurrente.");
+                        onConfirm(recurrente);
+                    }}>Confirmar y generar certificado</button>
+                    <button onClick={onCancel}>Cancelar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const Documents = () => {
 
@@ -40,11 +77,14 @@ export const Documents = () => {
     const expedienteInfoDispatch = useDispatch()
     const [pdfUrl, setPdfUrl] = useState('')
     const navigate = useNavigate()
-    const { id, eliminar_expedientes, subir_documentos, eliminar_documentos } = useSelector(state => state.auth)
+    const { id, eliminar_expedientes, subir_documentos, eliminar_documentos, certificar_expediente } = useSelector(state => state.auth)
     const { clave, fechaCreacion } = useSelector(state => state.expedienteInfo) //CONSUMIMOS EL STATE A TRAVÉS DE REDUX
     const { showModalMessage, showModalPDF, showModalUploadPDF } = useSelector(state => state.modal) //CONSUMIMOS EL STATE A TRAVÉS DE REDUX
     const { showLoader } = useSelector(state => state.loader) //CONSUMIMOS EL STATE A TRAVÉS DE REDUX
     const { showErrorMessage, errorMessage } = useSelector(state => state.errorMessage)
+    const { showModalLeyenda } = useSelector(state => state.modal);
+    const [tipoLeyendaModal, setTipoLeyendaModal] = useState(""); // NUEVO
+    const [leyendaPrevia, setLeyendaPrevia] = useState("");
     let expedientTotalPages = 0
 
 
@@ -179,7 +219,67 @@ export const Documents = () => {
 
     };
 
+    // Handler para certificado
+    const handleGenerarIntegradoCertificado = async () => {
+        setTipoLeyendaModal("certificado");
+        await generarIntegradoCertificado(
+            token, clave, expediente_id, loaderDispatch, setLoader, setPdfUrl, modalDispatch, setModal, setErrorGenerarIntegrado, errorMessagePortada,
+            (leyenda) => {
+                setLeyendaPrevia(leyenda);
+                modalDispatch(setModal({
+                    showModalMessage: false,
+                    showModalPDF: false,
+                    showModalUploadPDF: false,
+                    showModalLeyenda: true
+                }));
+            }
+        );
+    };
+    // Confirmación para certificado
+    const handleConfirmLeyendaCertificado = async (recurrente) => {
+        modalDispatch(setModal({
+            showModalMessage: false,
+            showModalPDF: false,
+            showModalUploadPDF: false,
+            showModalLeyenda: false
+        }));
+        await generarIntegradoCertificado(
+            token, clave, expediente_id, loaderDispatch, setLoader, setPdfUrl, modalDispatch, setModal, setErrorGenerarIntegrado, errorMessagePortada,
+            () => {},
+            recurrente
+        );
+    };
 
+// PRIMER FETCH: pide leyenda previa y muestra modal
+    const handleGenerarIntegradoFoliado = async () => {
+        await generarIntegradoFoliado(
+            token, cca, clave, expediente_id, selectedCheckboxes, loaderDispatch, setLoader, setPdfUrl, modalDispatch, setModal, setErrorGenerarIntegrado, errorMessagePortada,
+            (leyenda) => {
+                setLeyendaPrevia(leyenda);
+                modalDispatch(setModal({
+                    showModalMessage: false,
+                    showModalPDF: false,
+                    showModalUploadPDF: false,
+                    showModalLeyenda: true
+                }));
+            }
+        );
+    };
+
+    // SEGUNDO FETCH: con el recurrente, cierra modal
+    const handleConfirmLeyenda = async (recurrente) => {
+        modalDispatch(setModal({
+            showModalMessage: false,
+            showModalPDF: false,
+            showModalUploadPDF: false,
+            showModalLeyenda: false
+        }));
+        await generarIntegradoFoliado(
+            token, cca, clave, expediente_id, selectedCheckboxes, loaderDispatch, setLoader, setPdfUrl, modalDispatch, setModal, setErrorGenerarIntegrado, errorMessagePortada,
+            () => {},
+            recurrente
+        );
+    }
     const handleOpenUploadForm = () => {
         modalDispatch(setModal({
             showModalUploadPDF: true,
@@ -201,6 +301,24 @@ export const Documents = () => {
 
     return (
         <div>
+
+            {showModalLeyenda && (
+                <Modal>
+                    <CertificacionLeyendaModal
+                        leyendaPrevia={leyendaPrevia}
+                        onConfirm={tipoLeyendaModal === "certificado" ? handleConfirmLeyendaCertificado : handleConfirmLeyenda}
+                        onCancel={() =>
+                            modalDispatch(setModal({
+                                showModalMessage: false,
+                                showModalPDF: false,
+                                showModalUploadPDF: false,
+                                showModalLeyenda: false
+                            }))
+                        }
+                    />
+                </Modal>
+            )}
+            
             {showErrorMessage && showModalMessage ? (
                 <Modal>
                     <ErrorMessage>
@@ -276,12 +394,25 @@ export const Documents = () => {
                         Generar Integrado
                     </span>
                 </button>
-
-                {Object.keys(selectedCheckboxes).length > 0 ?
+            {certificar_expediente ? (
+                <button
+                    className="btn-generar-integrado"
+                    type="button"
+                    onClick={handleGenerarIntegradoCertificado}
+                >
+                    <img src={generar_integrado} alt=""
+                        className="upload-icon-btn-documents" />
+                    <span className="btn-select-name">
+                        Generar Integrado Certificado
+                    </span>
+                </button>
+            ) : null}
+                {/*}
+                {Object.keys(selectedCheckboxes).length > 0 ? (
                     <button
                         className="btn-generar-integrado"
                         type="submit"
-                        onClick={() => generarIntegradoFoliado(token, cca, clave, expediente_id, selectedCheckboxes, loaderDispatch, setLoader, setPdfUrl, modalDispatch, setModal, setErrorGenerarIntegrado, errorMessagePortada)}
+                        onClick={handleGenerarIntegradoFoliado}
                     >
                         <img src={generar_integrado} alt=""
                             className="upload-icon-btn-documents" />
@@ -289,7 +420,21 @@ export const Documents = () => {
                             Generar Integrado y foliarlo
                         </span>
                     </button>
-                    : ''}
+                ) : ''}
+
+                */}
+                {/* NUEVO BOTÓN DE FIRMA ELECTRÓNICA */}
+                <button
+                    className="btn-generar-integrado"
+                    type="button"
+                    onClick={() => window.open('http://192.168.10.66:32116/', '_blank')}
+                >
+                    {/* Si tienes un icono para la firma, descomenta la línea de abajo y agrega el archivo en tu carpeta img/icons */}
+                    {/* <img src={firma_icon} alt="Firma" className="upload-icon-btn-documents" /> */}
+                    <span className="btn-select-name">
+                        Firma Electrónica
+                    </span>
+                </button>
 
                 {eliminar_expedientes ? (
                     <button

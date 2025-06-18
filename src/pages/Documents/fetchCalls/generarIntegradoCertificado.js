@@ -1,38 +1,29 @@
 import { URL_API } from "../../../utils/constants"
 import { addRegistroBitacora } from "../../CrearExpediente/fetchCalls/addRegistroBitacora"
 
-export const generarIntegradoFoliado = async (
+export const generarIntegradoCertificado = async (
     token,
-    cca,
     clave,
     expediente_id,
-    selectedCheckboxes,
     loaderDispatch,
     setLoader,
     setPdfUrl,
     modalDispatch,
     setModal,
-    setErrorGenerarIntegrado,
+    setErrorGenerarCertificado,
     errorMessagePortada,
-    setLeyendaPrevia,    // <- NUEVO: función para guardar la leyenda previa en el state
-    recurrente           // <- NUEVO: el valor del recurrente, opcional
+    setLeyendaPrevia,    // función para guardar la leyenda previa
+    recurrente           // valor ingresado por el usuario, opcional
 ) => {
-
-    const selectedDocumentsData = Object.keys(selectedCheckboxes).map(Number)
-
-    loaderDispatch(setLoader({
-        showLoader: true
-    }))
-
+    loaderDispatch(setLoader({ showLoader: true }))
     try {
         const bodyData = {
             "clave": clave,
             "expediente": expediente_id,
-            "documents": selectedDocumentsData
         }
         if (recurrente) bodyData["recurrente"] = recurrente
 
-        const url = `${URL_API}/digitalizacion/generar-integrado-con-archivos-seleccionados/`
+        const url = `${URL_API}/digitalizacion/generar-integrado-certificado/`
         const respuesta = await fetch(url, {
             method: 'POST',
             body: JSON.stringify(bodyData),
@@ -43,23 +34,21 @@ export const generarIntegradoFoliado = async (
         })
         const resultado = await respuesta.json()
 
-        loaderDispatch(setLoader({
-            showLoader: false
-        }))
+        loaderDispatch(setLoader({ showLoader: false }))
 
-        // PASO 1: Si el backend responde con leyenda_previa, abre modal de confirmación
+        // Si el backend pide confirmación del recurrente (leyenda_previa)
         if (resultado.leyenda_previa) {
             setLeyendaPrevia(resultado.leyenda_previa)
             modalDispatch(setModal({
                 showModalMessage: false,
                 showModalPDF: false,
                 showModalUploadPDF: false,
-                showModalLeyenda: true    // <-- nuevo estado para abrir el modal de leyenda
+                showModalLeyenda: true    // Abre el modal de confirmación de leyenda
             }))
             return
         }
 
-        // PASO 2: Si responde con documento, muestra el PDF final
+        // Si devuelve el PDF final
         if (resultado.documento) {
             setPdfUrl(`${URL_API}/files/` + resultado.documento)
             modalDispatch(setModal({
@@ -72,7 +61,7 @@ export const generarIntegradoFoliado = async (
         }
 
     } catch (error) {
-        setErrorGenerarIntegrado(true)
+        setErrorGenerarCertificado(true)
         errorMessagePortada()
     }
 }
